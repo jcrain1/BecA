@@ -20,18 +20,8 @@ options(digits = 10) #set options to include lots of digits
 ```
 
 ```{r get_functions}
-source('./scripts/Functions.r') #source functions
-```
 
-#Load Data
-```{r load_data}
-gbs <- read.table(file = './data/Original_Data/tpg12-06-0006-dataset-s2', check.names = FALSE, header = TRUE, sep = ',', quote = '\"', row.names = 1)
-
-any(duplicated(gbs$rs)) #see if there are duplicated matches
-
-gbs <- gbs[!duplicated(gbs$rs), ] #remove multiple SNPs in the same strings
-
-reworked_fun <- function(x="hap matrix", y="columns to skip", z="population number"){
+modified_hap <- function(x="hap matrix", y="columns to skip", z="population number"){
       geno=x
       #recount allele A and B and het
       alleleA=rowSums(geno[,(y+1):ncol(geno)]!=substring(geno$alleles, 3, 3) & geno[,(y+1):ncol(geno)]!="N") #only counts what is not allele B and missing.  i.e. counts allele A and various calls for heterozygous
@@ -76,8 +66,17 @@ hap_to_G_modified  <- function(x="hap matrix", y="number of columns of informati
   hap01[x== "N"]=NA
   
   return(hap01)}
+```
 
-gbs <- reworked_fun(gbs, 3, 254) #calculates population parameters
+#Load Data
+```{r load_data}
+gbs <- read.table(file = './data/Original_Data/tpg12-06-0006-dataset-s2', check.names = FALSE, header = TRUE, sep = ',', quote = '\"', row.names = 1)
+
+any(duplicated(gbs$rs)) #see if there are duplicated matches
+
+gbs <- gbs[!duplicated(gbs$rs), ] #remove multiple SNPs in the same strings
+
+gbs <- moadified_hap(gbs, 3, 254) #calculates population parameters
 
 hist(gbs$MAF) #graph minor allele frequency
 #remove minor allele frequency < 0.05
@@ -104,7 +103,7 @@ require(rrBLUP)
 rownames(marker) <- marker$rs #set row names
 geno <- t(marker[, 10:ncol(marker)])
 
-gmat <- rrBLUP::A.mat(geno)
+gmat <- rrBLUP::A.mat(geno) #make genomic relationship matrix
 
 
 phen$GID <- paste('GID', phen$GID, sep = '') #make GIDs match
@@ -236,14 +235,23 @@ gs_correlation <- ddply(marker_number_out, .(marker_density, iteration), .fun = 
 #graph data
 boxplot(gs_correlation$V1 ~ gs_correlation$marker_density)
 
+#look at training population number
+cv_number <- c(2, 4, 5, 6, 8, 10)
 
-gs_pred_TKW = NULL
+train_number_out <- NULL #set up object to hold prediction
 
-for(i in 1:7){ #enter for loop
-    x = phen
-    print(paste('Loop progress:', i, sep=' ')) #check progress
-      phenoPredict <- x[x$fold == i ,] #get phenoPredict group
-      phenoTrain <- x[!x$fold == i , ] #get phenoTrain group
+#loop over each marker number
+for(i in 1:length(cv_number)){
+  t_number <- cv_number[i] #get the number of individuals in training pop
+  
+  #want to repeat sampling 10 times
+  for(j in 1:10){
+    phen$train_pop <- sample(x = t_number, size = nrow(phen), replace = TRUE) #get a random sample of the markers
+    for(k in 1:max(phen$train_pop)){
+     x = phen
+    print(paste('Training Population CV:', t_number, 'Iteration:', j, 'Loop progress:', k, sep=' ')) #check progress
+      phenoPredict <- x[x$train_pop == k ,] #get phenoPredict group
+      phenoTrain <- x[!x$train_pop == k , ] #get phenoTrain group
       
      #order marker matrix by rbind values of phenoTrain and phenoPredict
       ord <- c(as.character(phenoTrain$GID), as.character(phenoPredict$GID))
@@ -258,7 +266,7 @@ for(i in 1:7){ #enter for loop
         mat <- A.mat(g)
 
      ##prepare phenotype frame
-       phenoPredict[ , 'Irrig_TKW'] <- NA #set phenotype value to NA
+       phenoPredict[ , 'Drought_Yield'] <- NA #set phenotype value to NA
 
        ##make phenotypic frame
        phenotypic <- rbind(phenoTrain, phenoPredict)
@@ -266,7 +274,7 @@ for(i in 1:7){ #enter for loop
     #check that phenotypic and genotypic order are correct
        print(paste('Check that all phenotype data is in order:  ', all(rownames(g) == phenotypic$plant_id), sep=''))
 
-        ans <- kin.blup(phenotypic, K = mat, geno = "GID" , pheno ="Irrig_TKW") #run rrBLUP
+        ans <- kin.blup(phenotypic, K = mat, geno = "GID" , pheno = "Drought_Yield") #run rrBLUP
      
       preds <- ans$g #extract prediction
 
@@ -275,16 +283,28 @@ for(i in 1:7){ #enter for loop
       preds$GID <- rownames(preds) #get plant_id
       rownames(preds) <- NULL #set rownames as NULL
       
+      preds$training_fold <- t_number #set marker density
+      preds$iteration <- j #set iteration number 
       #set out
-      gs_pred_TKW <- rbind(gs_pred_TKW, preds)
-      
+      train_number_out <- rbind(train_number_out, preds)
+    
+    }
+    }
+  
 }
 
-    #Evaluate prediction
-accuracy_TKW <- merge(phen, gs_pred_TKW, by = 'GID')
+#Now we have predictions need to get correlations
+require(plyr)
 
-plot(accuracy_TKW$Irrig_TKW, accuracy_TKW$preds) 
-cor(accuracy_TKW$Irrig_TKW, accuracy_TKW$preds)
+gs_correlation_train <- ddply(train_number_out, .(training_fold, iteration), .fun = function(x){
+  correlation_file = merge(x, phen, by = 'GID')
+  correlation_value = cor(correlation_file$preds, correlation_file$Drought_Yield)
+  return(correlation_value)
+})
+
+#graph data
+boxplot(gs_correlation_train$V1 ~ gs_correlation_train$training_fold)
+
 
 ```
 
@@ -346,56 +366,6 @@ dart_drought <- merge(phen, dart_drought, by = 'GID')
 
 plot(dart_drought$Drought_Yield, dart_drought$preds) 
 cor(dart_drought$Drought_Yield, dart_drought$preds)
-
-
-dart_TKW = NULL
-
-for(i in 1:7){ #enter for loop
-    x = phen
-    print(paste('Loop progress:', i, sep=' ')) #check progress
-      phenoPredict <- x[x$fold == i ,] #get phenoPredict group
-      phenoTrain <- x[!x$fold == i , ] #get phenoTrain group
-      
-     #order marker matrix by rbind values of phenoTrain and phenoPredict
-      ord <- c(as.character(phenoTrain$GID), as.character(phenoPredict$GID))
-
-      #order genotypic data
-      g <- dart[match(ord, rownames(dart)),]
-
-      print(paste('Check that marker matrix is in order: ', all(as.character(phenoTrain$plant_id) == rownames(g)[1:nrow(phenoTrain)]), sep='')) #check
-      print(paste('Check that genotype matrix is in order: ', all(phenoPredict$plant_id == rownames(g)[(nrow(g)-nrow(phenoPredict)+1):nrow(g)]) , sep=''))
-      
-        #rrBLUP for genomic additive relationship matrix
-        mat <- A.mat(g)
-
-     ##prepare phenotype frame
-       phenoPredict[ , 'Irrig_TKW'] <- NA #set phenotype value to NA
-
-       ##make phenotypic frame
-       phenotypic <- rbind(phenoTrain, phenoPredict)
-
-    #check that phenotypic and genotypic order are correct
-       print(paste('Check that all phenotype data is in order:  ', all(rownames(g) == phenotypic$plant_id), sep=''))
-
-        ans <- kin.blup(phenotypic, K = mat, geno = "GID" , pheno ="Irrig_TKW") #run rrBLUP
-     
-      preds <- ans$g #extract prediction
-
-      preds <- preds[names(preds) %in% phenoPredict$GID] #get only predictions
-      preds <- as.data.frame(preds) #make into a dataframe
-      preds$GID <- rownames(preds) #get plant_id
-      rownames(preds) <- NULL #set rownames as NULL
-      
-      #set out
-      dart_TKW <- rbind(dart_TKW, preds)
-      
-}
-
-  #Evaluate prediction
-dart_TKW <- merge(phen, dart_TKW, by = 'GID')
-
-plot(dart_TKW$Irrig_TKW, dart_TKW$preds) 
-cor(dart_TKW$Irrig_TKW, dart_TKW$preds)
 
 
 

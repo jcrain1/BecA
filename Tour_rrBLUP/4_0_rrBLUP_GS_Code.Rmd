@@ -9,7 +9,7 @@ editor_options:
 
 #Objective
 
-Use sample data and scripts from TCAP webinar to learn rrBLUP.
+Use sample data and scripts from TCAP webinar to learn rrBLUP.  Based on presentation by Amy Jacobson December 18, 2012.
 
 ```{r setup, eval=TRUE}
 #set up working direcotories
