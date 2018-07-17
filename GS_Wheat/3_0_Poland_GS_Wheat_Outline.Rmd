@@ -20,7 +20,6 @@ options(digits = 10) #set options to include lots of digits
 ```
 
 ```{r get_functions}
-
 modified_hap <- function(x="hap matrix", y="columns to skip", z="population number"){
       geno=x
       #recount allele A and B and het
@@ -70,13 +69,31 @@ hap_to_G_modified  <- function(x="hap matrix", y="number of columns of informati
 
 #Load Data
 ```{r load_data}
-gbs <- read.table(file = './data/Original_Data/tpg12-06-0006-dataset-s2', check.names = FALSE, header = TRUE, sep = ',', quote = '\"', row.names = 1)
+gbs <- read.table(file = './data/Original_Data/tpg12-06-0006-dataset-s2', check.names = FALSE, header = TRUE, sep = ',', quote = '\"', row.names = 1, stringsAsFactors = FALSE)
 
 any(duplicated(gbs$rs)) #see if there are duplicated matches
 
 gbs <- gbs[!duplicated(gbs$rs), ] #remove multiple SNPs in the same strings
 
-gbs <- moadified_hap(gbs, 3, 254) #calculates population parameters
+gbs <- modified_hap(gbs, 3, 254) #calculates population parameters
+
+###########look at how population parameters were calculated#################
+snp <- t(gbs[1, ]) #get one SNP
+ 
+alleleA <- sum(snp[10:263] == 'A') + sum(snp[10:263] == 'H')#count allele in position 1
+het <- sum(snp[10:263] == 'H') #count heterozygous
+alleleB <- sum(snp[10:263] == 'T') + sum(snp[10:263] == 'H')#count allele in position 2
+
+#254 individuals
+missing <- sum(snp[10:263] == 'N') #count missing calls
+scored <- sum(snp[10:263] != 'N') #number of individuals not missing
+present <- 1 - missing/254 #number present
+
+#MAF
+maf <- min(((alleleA - het)*2 + het), ((alleleB - het)*2 + het))/sum((alleleA - het)*2, het, (alleleB -het)*2)
+
+#percent het
+perHet <- het/scored
 
 hist(gbs$MAF) #graph minor allele frequency
 #remove minor allele frequency < 0.05
@@ -85,6 +102,7 @@ hist(gbs$present)
 #remove markers with more than 70 % missing data
 gbs <- gbs[gbs$present > 0.3, ]
 
+hist(gbs$percentHET)
 
 marker <- hap_to_G_modified(gbs, 9) #convert to marker matrix
 
@@ -92,8 +110,11 @@ phen <- read.delim(file = './data/Intermediate_File/tpg12-06-0006-dataset-s1_Phe
 
 require(rrBLUP)
 
-set.seed(2017121112)
-phen$fold <- sample(1:7, size = nrow(phen), replace = TRUE)
+set.seed(123)
+phen$fold <- sample(1:7, size = 254, replace = TRUE)
+
+phen$PEDIGREE <- as.factor(phen$PEDIGREE) #NEW to use pedigree for fold validation
+phen$fold <-as.numeric(phen$PEDIGREE) #NEW
 
 #Usually here I would write files out to save work
 
@@ -109,11 +130,13 @@ gmat <- rrBLUP::A.mat(geno) #make genomic relationship matrix
 phen$GID <- paste('GID', phen$GID, sep = '') #make GIDs match
 
 phen <- phen[match(phen$GID, rownames(geno)), ] #make sure rownames match
-gs_pred = NULL
+all(phen$GID == colnames(gmat))
 
-for(i in 1:7){ #enter for loop
+gs_pred = NULL
+i=1
+for(i in 1:max(phen$fold)){ #enter for loop #MODIFIED 
     x = phen
-    print(paste('Loop progress:', i, sep=' ')) #check progress
+    print(paste('Loop Progress:', i, sep=' ')) #check progress
       phenoPredict <- x[x$fold == i ,] #get phenoPredict group
       phenoTrain <- x[!x$fold == i , ] #get phenoTrain group
       
@@ -140,7 +163,7 @@ for(i in 1:7){ #enter for loop
 
         ans <- kin.blup(phenotypic, K = mat, geno = "GID" , pheno ="Drought_Yield") #run rrBLUP
      
-      preds <- ans$g #extract prediction
+      preds <- ans$pred #extract prediction
 
       preds <- preds[names(preds) %in% phenoPredict$GID] #get only predictions
       preds <- as.data.frame(preds) #make into a dataframe
@@ -163,7 +186,7 @@ cor(accuracy$Drought_Yield, accuracy$preds) #correlation or accuracy
 #evaluate how the number of markers effect GS prediction accuracy
 ```{r marker_number_drought}
 #marker number to try for prediction accruacy
-marker_number <- c(250, 500, 750, 1000, 1250, 2500, 5000, 10000)
+marker_number <- c(250, 500, 750, 1000, 1250, 2500)
 
 
 marker_number_out <- NULL #set up an object to hold our results
@@ -174,6 +197,7 @@ for(i in 1:length(marker_number)){
   #want to repeat sampling 10 times
   for(j in 1:10){
     marker_density <- sample(x = nrow(marker), size = m_number, replace = FALSE) #get a random sample of the markers
+    
     for(k in 1:7){
      x = phen
     print(paste('Marker density:', m_number, 'Iteration:', j, 'Loop progress:', k, sep=' ')) #check progress
@@ -184,10 +208,10 @@ for(i in 1:length(marker_number)){
       ord <- c(as.character(phenoTrain$GID), as.character(phenoPredict$GID))
 
       #order genotypic data
-      g <- geno[match(ord, rownames(geno)),]
+      g <- geno[match(ord, rownames(geno)),] 
       
       #########KEY only get markers in marker density#############
-      g <- g[, marker_density]
+      g <- g[, marker_density] #Modified
 
       print(paste('Check that marker matrix is in order: ', all(as.character(phenoTrain$plant_id) == rownames(g)[1:nrow(phenoTrain)]), sep='')) #check
       print(paste('Check that genotype matrix is in order: ', all(phenoPredict$plant_id == rownames(g)[(nrow(g)-nrow(phenoPredict)+1):nrow(g)]) , sep=''))
@@ -206,13 +230,15 @@ for(i in 1:length(marker_number)){
 
         ans <- kin.blup(phenotypic, K = mat, geno = "GID" , pheno = "Drought_Yield") #run rrBLUP
      
-      preds <- ans$g #extract prediction
+      preds <- ans$pred #extract prediction
 
       preds <- preds[names(preds) %in% phenoPredict$GID] #get only predictions
       preds <- as.data.frame(preds) #make into a dataframe
       preds$GID <- rownames(preds) #get plant_id
       rownames(preds) <- NULL #set rownames as NULL
       
+      
+      #NEW Information
       preds$marker_density <- m_number #set marker density
       preds$iteration <- j #set iteration number 
       #set out
@@ -221,7 +247,7 @@ for(i in 1:length(marker_number)){
     }
     }
   
-}
+} #loops close
 
 #Now we have predictions need to get correlations
 require(plyr)
