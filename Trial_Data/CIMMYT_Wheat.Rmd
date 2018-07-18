@@ -1,4 +1,5 @@
 ---
+title: "GS in CIMMYT Wheat"
 author: "Make this your own"
 date: "`r format(Sys.time(), '%B %d, %Y')`"
 output: html_document
