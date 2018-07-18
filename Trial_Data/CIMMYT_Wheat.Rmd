@@ -1,5 +1,4 @@
 ---
-title: "GS in CIMMYT Wheat"
 author: "Make this your own"
 date: "`r format(Sys.time(), '%B %d, %Y')`"
 output: html_document
@@ -35,8 +34,8 @@ Genomic Information to Increase Prediction and Selection Accuracy in Wheat Breed
 #Objective 1:  Set up a model using only the drought 2014 data for grain yield.
 
 ```{r setup, eval=TRUE}
-knitr::opts_knit$set(root.dir = '')
-setwd('')
+knitr::opts_knit$set(root.dir = '/Users/jcrain/Documents/Analysis/BecA_Class_Genomics/')
+setwd('/Users/jcrain/Documents/Analysis/BecA_Class_Genomics/')
 options(digits = 10) #set options to include lots of digits
 #Git link
 #https://github.com/jcrain1/BecA
@@ -93,24 +92,106 @@ hap_to_G=function(x="hap matrix", y="number of columns of information"){
 #Load Data
 
 ```{r load_data}
+marker <- read.delim(file = './data/Original_Data/Beagle_Imputed.hmp.txt', check.names = FALSE, header = TRUE, stringsAsFactors = FALSE) #load marker data
 
+phen <- read.table(file = './data/Original_Data/EYT_Phenotype_Imputed_GS_Simple.txt', header = TRUE, stringsAsFactors = FALSE) #load phenoytpe data
 
 ```
 
 #Examine Data
 ```{r examine_data}
 #potential genotype filtering
+hap <- tassel5_to_params(marker, 11, z = 2033) #get population paramters
+
+hist(hap$MAF) #there are few alleles that could be filtered
+hist(hap$present) #why is this?  Imputed data for all values
+hist(hap$percentHET) #inbred wheat lines is this expected?
+
+hap <- hap[hap$MAF > 0.05, ] #filter at MAF > 0.05
+
+geno <- hap_to_G(hap, 17) #make marker matrix
+
+rownames(geno) <- geno$`rs#` #give rownames
+gs_marker <- t(geno[, 18:ncol(geno)])
+
+dim(gs_marker) #check gs_marker number
+
 #potential phenotype filtering
+str(phen)
+#only get 2014 drought
+phen <- phen[phen$Experiment_id == '14_OBR_EYT', ]
+phen <- phen[, c(1, 8:10, 12)] #only get grain yield, trial_id, GID etc.  Just easier to work with less mess
+any(is.na(phen$gy_effect)) #check that all grain yield is ther
+
+#get only marker in phen
+gs_marker <- gs_marker[rownames(gs_marker) %in% phen$GID_DNA, ]
+
+nrow(gs_marker) == nrow(phen) #check number of individuals in marker and phenotype population the same
+
+
+
 ```
 
 #Set up Model
 ```{r gs_model}
+require(rrBLUP)
+gs_pred = NULL
+
+for(i in 1:max(phen$cimmyt_tid)){ #enter for loop #MODIFIED 
+    x = phen
+    print(paste('Loop or CV fold:', i, sep=' ')) #check progress
+      phenoPredict <- x[x$cimmyt_tid == i ,] #get phenoPredict group
+      phenoTrain <- x[!x$cimmyt_tid == i , ] #get phenoTrain group
+      
+     #order marker matrix by rbind values of phenoTrain and phenoPredict
+      ord <- c(as.character(phenoTrain$GID_DNA), as.character(phenoPredict$GID_DNA))
+
+      #order genotypic data
+      g <- gs_marker[match(ord, rownames(gs_marker)),]
+
+      print(paste('Check that g has training individuals first: ', all(as.character(phenoTrain$GID_DNA) == rownames(g)[1:nrow(phenoTrain)] && !is.null(phenoTrain$GID_DNA)), sep='')) #check
+      print(paste('Check g has prediction individuals last: ', all(as.character(phenoPredict$GID_DNA) == rownames(g)[(nrow(g)-nrow(phenoPredict)+1):nrow(g)]  && !is.null(phenoPredict$GID_DNA)) , sep=''))
+      
+        #rrBLUP for genomic additive relationship matrix
+        mat <- A.mat(g)
+
+     ##prepare phenotype frame
+       phenoPredict[ , 'gy_effect'] <- NA #set phenotype value to NA
+
+       ##make phenotypic frame
+       phenotypic <- rbind(phenoTrain, phenoPredict)
+
+    #check that phenotypic and genotypic order are correct
+       print(paste('Check that all phenotype data is in order:  ', all(rownames(g) == phenotypic$GID_DNA && !is.null(phenotypic$GID_DNA)), sep=''))
+
+        ans <- kin.blup(phenotypic, K = mat, geno = "GID_DNA" , pheno ="gy_effect") #run rrBLUP
+     
+      preds <- ans$pred #extract prediction
+
+      preds <- preds[names(preds) %in% phenoPredict$GID_DNA] #get only predictions
+      preds <- as.data.frame(preds) #make into a dataframe
+      preds$GID_DNA <- rownames(preds) #get plant_id
+      rownames(preds) <- NULL #set rownames as NULL
+      
+      #set out
+      gs_pred <- rbind(gs_pred, preds)
+      
+} #close for loop
+
+
+
 
 ```
 
 #Validate Model
 ```{r examine_model_accuracy}
+#Evaluate prediction
+accuracy <- merge(phen, gs_pred, by = 'GID_DNA') #merge prediction data set and original phenotyep data set
 
+plot(accuracy$gy_effect, accuracy$preds, xlab = 'Observed value', ylab = 'Predicted value') #quick graph
+abline(lm(accuracy$preds~accuracy$gy_effect), col = 'red') #add trendline
+
+cor(accuracy$gy_effect, accuracy$preds) #correlation or accuracy
 
 ```
 
@@ -118,5 +199,5 @@ hap_to_G=function(x="hap matrix", y="number of columns of information"){
 
 #R Session Information
 ```{r what_packages_and_version}
-
+sessionInfo() #get session information
 ```
