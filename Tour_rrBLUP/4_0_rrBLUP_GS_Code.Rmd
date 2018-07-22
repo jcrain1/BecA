@@ -13,8 +13,8 @@ Use sample data and scripts from TCAP webinar to learn rrBLUP.  Based on present
 
 ```{r setup, eval=TRUE}
 #set up working direcotories
-knitr::opts_knit$set(root.dir = '/Users/jcrain/Documents/Analysis/BecA_Class_Genomics/')
-setwd('/Users/jcrain/Documents/Analysis/BecA_Class_Genomics/')
+knitr::opts_knit$set(root.dir = '/Users/jcrain/Documents/Class/Genomic_Selection/Github/BecA/Tour_rrBLUP/')
+setwd('/Users/jcrain/Documents/Class/Genomic_Selection/Github/BecA/Tour_rrBLUP/')
 options(digits = 10) #set options to include lots of digits
 #Git link
 #

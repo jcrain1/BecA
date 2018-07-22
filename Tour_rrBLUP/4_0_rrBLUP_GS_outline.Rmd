@@ -65,7 +65,7 @@ set.seed(2017121112) #make it reproducible
 #set up multiple iterations
 
 #check final accuracy
-mean(accuracy)
+
 
 
 ```

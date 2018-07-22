@@ -35,8 +35,8 @@ Genomic Information to Increase Prediction and Selection Accuracy in Wheat Breed
 #Objective 1:  Set up a model using only the drought 2014 data for grain yield.
 
 ```{r setup, eval=TRUE}
-knitr::opts_knit$set(root.dir = '/Users/jcrain/Documents/Analysis/BecA_Class_Genomics/')
-setwd('/Users/jcrain/Documents/Analysis/BecA_Class_Genomics/')
+knitr::opts_knit$set(root.dir = '/Users/jcrain/Documents/Class/Genomic_Selection/Github/BecA/Trial_Data/')
+setwd('/Users/jcrain/Documents/Class/Genomic_Selection/Github/BecA/Trial_Data/')
 options(digits = 10) #set options to include lots of digits
 #Git link
 #https://github.com/jcrain1/BecA
@@ -189,8 +189,10 @@ for(i in 1:max(phen$cimmyt_tid)){ #enter for loop #MODIFIED
 #Evaluate prediction
 accuracy <- merge(phen, gs_pred, by = 'GID_DNA') #merge prediction data set and original phenotyep data set
 
+pdf(file = './data/Figures/GS_Accuracy_Plot.pdf', height = 6, width = 8)
 plot(accuracy$gy_effect, accuracy$preds, xlab = 'Observed value', ylab = 'Predicted value') #quick graph
 abline(lm(accuracy$preds~accuracy$gy_effect), col = 'red') #add trendline
+dev.off()
 
 cor(accuracy$gy_effect, accuracy$preds) #correlation or accuracy
 
