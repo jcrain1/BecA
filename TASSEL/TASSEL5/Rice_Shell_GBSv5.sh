@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 
 
 ###########################################
@@ -6,10 +6,11 @@
 ## Adapted from Narinder Singh           ##
 ###########################################
 
-#SBATCH --mail-type=ALL   # same as =BEGIN,FAIL,END --mail-user=jcrain@ksu.edu
-#SBATCH --mem-per-cpu=20G   # Memory per core, use --mem= for memory per node
-#SBATCH --time=0-06:00:00   # Use the form DD-HH:MM:SS
-#SBATCH --job-name=rice_example  #Add a name to the job
+##These commands seem to cause problems but could be used as follows:
+##SBATCH --mail-type=ALL   # same as =BEGIN,FAIL,END 
+##SBATCH --mem-per-cpu=20G   # Memory per core, use --mem= for memory per node
+##SBATCH --time=0-06:00:00   # Use the form DD-HH:MM:SS
+##SBATCH --job-name=rice_example  #Add a name to the job
 
 #load modules
 module load bowtie2/2.3.4.1  #load bowtie

@@ -8,7 +8,7 @@ editor_options:
 ---
 #Objective
 
-Implement a GWAS on the data from Streit et al. (2013) "Using Genome-Wide Association Analysis to Characterize Environmental Sensitivity of Milk Traits in Dairy Cattle."
+Implement a GWAS on the data from Streit et al. (2013) "Using Genome-Wide Association Analysis to Characterize Environmental Sensitivity of Milk Traits in Dairy Cattle."  The data sets we are using are a sample of the original data sets, 12,559,327 phenotypic observations and 41,350 genotypic markers.  The full data set can be downloaded from the G3 website.
 
 The marker set has already been imputed and filtered; however markers have 2, 3, 4 coding pattern.  This is a huge data set, therefore, first fit a GWAS to a sample set of markers.  Then load the entire data set and identify a specific chromosome to assay based on your original results.
 
