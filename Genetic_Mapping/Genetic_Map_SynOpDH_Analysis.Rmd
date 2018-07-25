@@ -25,7 +25,7 @@ Make genetic map using markers.
 
 ```{r gbs_map}
 require(plyr)
-snop <- read.delim(file = './data/Original_Data/SynOpDH.hmp.txt', header = TRUE, stringsAsFactors = FALSE, check.names = FALSE) #read in file
+snop <- read.delim(file = './data/Original_Data/HapMap.hmp.txt', header = TRUE, stringsAsFactors = FALSE, check.names = FALSE) #read in file
 
 colnames(snop) <- gsub('_merged_X3', '', colnames(snop)) #remove merged_X3
 
@@ -85,7 +85,7 @@ map <- read.csv(file = './data/Intermediate_File/SynOpDH_UNEAK_Markers.csv', hea
 map_out <- mstmap(map, pop.type = 'DH', dist.fun = 'kosambi', objective.fun = 'COUNT', p.value = 1e-06, noMap.dist = 25, noMap.size = 35, miss.thresh = 200) #play with parameters to make better map
 
 plot(map_out)
-pdf(file = './data/Intermediate_File/Linkage_Map.pdf', height = 6, width = 8)
+pdf(file = './data/Figures/Linkage_Map.pdf', height = 6, width = 8)
 plotMap(map_out) #plot the genetic map
 dev.off()
 map_out$geno$L1$map #look at linkage groups
@@ -114,6 +114,10 @@ marker_out <- marker_out[order(marker_out$linkage_group, marker_out$cM),] #order
 write.csv(marker_out, file = './data/Intermediate_File/Markers_Map.csv', row.names = FALSE, quote = FALSE) #write file out
 
 ```
+
+#Confirm Map
+
+Extract tag positions using marker data, and BLAST the tags to the wheat genome.  See how many tags that are on the same linkage group relate to the reference genome.
 
 #Session Information
 
