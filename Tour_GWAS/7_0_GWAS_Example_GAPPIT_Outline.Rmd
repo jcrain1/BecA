@@ -87,9 +87,9 @@ markers <- geno[,c(1, 3, 4, 18:ncol(geno))] #get markers for GWAS.  Markers ente
 require(factoextra)
 #Population Structure
 #first must impute missing data (use mean imputation)
-imputed_markers <- A.mat(markers[, 4:ncol(markers)], impute.method = 'mean', min.MAF = 0.05, return.imputed = TRUE )$imputed
+imputed_markers <- A.mat(markers[, 4:ncol(markers)], impute.method = 'mean', min.MAF = 0.05, return.imputed = TRUE )$imputed 
 
-geno_pca <- prcomp(imputed_markers, scale. = TRUE) #run pca
+geno_pca <- prcomp(t(imputed_markers), scale. = TRUE) #enter markers in PCA as rows of individuals, columns of markers
 fviz_eig(geno_pca) #scree plot with factoextra
 
 ##Evaluate number of PC to choose look at variance explained by each PC
@@ -131,7 +131,7 @@ max(rrout$dpoll)
 max(rrout$EarDia)
 
 #Excessive PCs
-rrout_many_pc <- GWAS(phen[, 1:4], geno = imputed_markers, K=gmat, min.MAF = 0.05, n.core=3, plot = TRUE, n.PC = 10)  #run with principal components
+rrout_many_pc <- GWAS(phen[, 1:4], geno = imputed_markers, K=gmat, min.MAF = 0.05, n.core=3, plot = TRUE, n.PC = 100)  #run with principal components
 
 max(rrout_many_pc$EarHT)
 max(rrout_many_pc$dpoll)
