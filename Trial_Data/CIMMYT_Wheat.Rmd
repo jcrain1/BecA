@@ -128,12 +128,9 @@ any(is.na(phen$gy_effect)) #check that all grain yield is ther
 gs_marker <- gs_marker[rownames(gs_marker) %in% phen$GID_DNA, ]
 
 nrow(gs_marker) == nrow(phen) #check number of individuals in marker and phenotype population the same
-
-
-
 ```
 
-#Set up Model
+#Set up GS Model
 ```{r gs_model}
 require(rrBLUP)
 gs_pred = NULL
@@ -199,6 +196,51 @@ cor(accuracy$gy_effect, accuracy$preds) #correlation or accuracy
 ```
 
 #Objective 2 Make your own model for a trait and experiment
+
+##GWAS on data
+Implement a GWAS on data.
+
+```{r gwas_on_data}
+require(factoextra)
+require(rrBLUP)
+
+#run and save results
+geno_pca <- prcomp(gs_marker, scale. = T) #run PCA
+
+fviz_eig(geno_pca) #scree plot with factoextra
+
+#extract components
+std_dev <- geno_pca$sdev
+
+#compute variance
+pr_var <- std_dev^2
+prop_varex <- pr_var/sum(pr_var) #compute proportion of the variance
+
+plot(cumsum(prop_varex), xlab = "Principal Component",
+     ylab = "Cumulative Proportion of Variance Explained",
+     type = "b")
+
+screeplot(geno_pca, npcs = 25, type = 'line')
+
+#make realized relationship matrix
+gmat <- A.mat(gs_marker) #get realized relationship matrix
+
+#organize phenotype data
+all(phen$GID_DNA==rownames(gmat))
+phen <- phen[match(rownames(gmat), phen$GID_DNA),]
+all(phen$GID_DNA==rownames(gmat))
+
+#organize markers to go into GWAS
+gwas_marker <- t(gs_marker)
+gwas_marker <- cbind(hap[, c(1, 3, 4)], gwas_marker) #join map information from hap file
+
+#Run gwas model
+rrout <- GWAS(phen[, c(1,5)], geno = gwas_marker, K = gmat, min.MAF = 0.05, n.core=3, plot = TRUE, n.PC = 9)
+
+
+#Chromosome 5B 212342796bp -- 226781405bp  14438609 (14Mb region)
+rrout[which.max(rrout$gy_effect), ] #get chromosome to investigate
+```
 
 #R Session Information
 ```{r what_packages_and_version}

@@ -1,0 +1,112 @@
+---
+title: "R/qtl Mapping"
+author: "Make this your own"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+#Objective
+
+Use the example data set with R/qtl package to generate a QTL map.  Data from R/qtl package and code from [http://www.rqtl.org/tutorials/rqtltour.R](http://www.rqtl.org/tutorials/rqtltour.R).
+
+```{r setup, eval=TRUE}
+knitr::opts_knit$set(root.dir = '/Users/jcrain/Documents/Class/Genomic_Selection/Github/BecA/Genetic_Mapping/')
+setwd('/Users/jcrain/Documents/Class/Genomic_Selection/Github/BecA/Genetic_Mapping/')
+options(digits = 10) #set options to include lots of digits
+#Git link
+##https://github.com/jcrain1/BecA
+```
+
+
+```{r qtl_map}
+require(qtl)
+data(hyper) #laod the hpertension data
+
+summary(hyper) #check the data object
+
+#R/QTL functions to understand the data
+nind(hyper) #prints the number of individuals
+nphe(hyper) #prints the number of phenotypes
+nchr(hyper) #prints the number of chromosomes
+totmar(hyper) #prints the total number of markers
+nmar(hyper) #prints the number of markers on each linkage/chromosome
+
+plot(hyper) #plot function that displays makrers, genetic map etc.
+
+plotMissing(hyper) #plots marker data
+plotMap(hyper) #plots the genetic map
+plotPheno(hyper, pheno.col=1) #plots the phenotype histogram
+
+plotMap(hyper, chr=c(1, 4, 6, 7, 15), show.marker.names=TRUE) #plot individual chromosomes withmarker names
+
+plotMissing(hyper, reorder=TRUE) #reorders data to value of phenotype
+
+hyper <- drop.nullmarkers(hyper) #drops marker from chorosome 14 that was missing in all individuals
+nmar(hyper) #prints the number of markers on each linkage/chromosome
+totmar(hyper)
+
+hyper <- est.rf(hyper) #estimate recombination rate
+plotRF(hyper)
+plotRF(hyper, chr=c(1,4))
+
+plotRF(hyper, chr=6)
+plotMissing(hyper, chr=6)
+
+newmap <- est.map(hyper, error.prob=0.01) #make a new map ordered chromosomes
+plotMap(hyper, newmap)
+
+hyper <- replace.map(hyper, newmap) #change map
+
+hyper <- calc.errorlod(hyper, error.prob=0.01)
+
+top.errorlod(hyper)
+
+plotGeno(hyper, chr=16, ind=c(24:34, 71:81))
+
+plotInfo(hyper)
+plotInfo(hyper, chr=c(1,4,15))
+plotInfo(hyper, chr=c(1,4,15), method="entropy")
+plotInfo(hyper, chr=c(1,4,15), method="variance")
+
+
+
+hyper <- calc.genoprob(hyper, step=1, error.prob=0.01) #calculate genotype probabilities
+
+out.em <- scanone(hyper) #run SIM qtl mapping
+out.hk <- scanone(hyper, method="hk")
+plot(out.em)
+plot(out.hk, add = TRUE, col = 'red')
+hyper <- sim.geno(hyper, step=2, n.draws=16, error.prob=0.01)
+out.imp <- scanone(hyper, method="imp")
+
+summary(out.em)
+summary(out.em, threshold=3)
+summary(out.hk, threshold=3)
+summary(out.imp, threshold=3)
+
+max(out.em)
+max(out.hk)
+max(out.imp)
+
+plot(out.em, chr=c(1,4,15))
+plot(out.em, out.hk, out.imp, chr=c(1,4,15))
+plot(out.em, out.hk, out.imp)
+plot(out.em, chr=c(1,4,15))
+plot(out.hk,  col="blue", add=TRUE)
+plot(out.hk, chr=c(1,4,15), col="blue", add=TRUE)
+plot(out.imp, chr=c(1,4,15), col="red", add=TRUE)
+
+operm.hk <- scanone(hyper, method="hk", n.perm=1000)
+
+summary(operm.hk, alpha=0.05)
+
+summary(out.hk, perms=operm.hk, alpha=0.05, pvalues=TRUE)
+```
+
+#Session Information
+
+```{r sessionInformation}
+sessionInfo()
+```

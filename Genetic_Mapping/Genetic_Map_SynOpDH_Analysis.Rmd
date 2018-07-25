@@ -85,8 +85,9 @@ map <- read.csv(file = './data/Intermediate_File/SynOpDH_UNEAK_Markers.csv', hea
 map_out <- mstmap(map, pop.type = 'DH', dist.fun = 'kosambi', objective.fun = 'COUNT', p.value = 1e-06, noMap.dist = 25, noMap.size = 35, miss.thresh = 200) #play with parameters to make better map
 
 plot(map_out)
+pdf(file = './data/Intermediate_File/Linkage_Map.pdf', height = 6, width = 8)
 plotMap(map_out) #plot the genetic map
-
+dev.off()
 map_out$geno$L1$map #look at linkage groups
 map_out$geno$L2$map
 
@@ -104,6 +105,13 @@ for(i in 1:length(map_out$geno)){ #get map data
 
 }
 
+ab_mat$marker_name <- rownames(ab_mat)
+
+marker_out <- merge(marker_map, ab_mat, by = 'marker_name')
+
+marker_out <- marker_out[order(marker_out$linkage_group, marker_out$cM),] #order by linkage group and chromosome
+
+write.csv(marker_out, file = './data/Intermediate_File/Markers_Map.csv', row.names = FALSE, quote = FALSE) #write file out
 
 ```
 
