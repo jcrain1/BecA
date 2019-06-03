@@ -1,0 +1,156 @@
+---
+title: "rrBLUP comparison of marker effect and GBLUP"
+author: "Jared Crain"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+#Objective
+
+Use sample data and scripts from TCAP webinar to learn rrBLUP.  Based on presentation by Amy Jacobson December 18, 2012.
+
+```{r setup, eval=TRUE}
+#set up working direcotories
+knitr::opts_knit$set(root.dir = '/Users/jcrain/Documents/Class/Genomic_Selection/Github/BecA/Tour_rrBLUP/')
+setwd('/Users/jcrain/Documents/Class/Genomic_Selection/Github/BecA/Tour_rrBLUP/')
+options(digits = 10) #set options to include lots of digits
+#Git link
+#
+
+require(rrBLUP)
+```
+
+```{r load_data, eval=TRUE}
+#load marker data
+marker <- read.table(file = './data/Original_Data/rrBLUP_Example_SNP.txt', header = FALSE) #load marker data
+
+#add column and row names
+colnames(marker) <- paste("Marker_", 1:ncol(marker), sep = '') #add marker column name
+rownames(marker) <- paste("Plant_", 1:nrow(marker), sep = "") #add plant name
+
+#load phenotypic data
+phen <- read.table(file = './data/Original_Data/rrBLUP_Example_Traits.txt', header = TRUE) #load phenotypic data
+
+dim(phen)
+```
+
+```{r evaluate_original_data}
+#check data formats for markers and phenotypes
+str(marker)
+str(phen)
+
+#impute missing markers
+imputed <- A.mat(X = marker, max.missing = 0.5, return.imputed = TRUE, impute.method = 'mean') #imputes with the mean value and discards markers with more than 50% missing data
+
+#get imputed data frame
+imputed_marker <- imputed$imputed #get imputed markers
+dim(imputed_marker)
+
+```
+
+```{r implement GS}
+#set up training population of 58 individuals and prediction population
+
+#Training population
+#set up a model to look at data
+set.seed(123) #make it reproducible
+train <- sample(x = 1:nrow(marker), size = 58, replace = FALSE )
+pred <- setdiff(1:96, train) #get prediction population
+
+train_marker <- imputed_marker[train, ] #get markers in training set
+train_phen <- phen[train, ] #get phenotype in training population
+
+#prediction population
+predict_maker <- imputed_marker[pred, ] #get indivdual genotypes of prediction data set
+predict_phen <- phen[pred, ] #get indivdual phenotypes of prediction set
+
+
+#we have four sets of data
+#2 phenotype (training and prediction)
+#2 phenotypes (training and prediction)
+
+#run rrBLUP mixed.sovle
+yield_answer <- mixed.solve(y = train_phen[, 1], Z = train_marker, K = NULL, SE = FALSE, return.Hinv = FALSE) #mixed mode.
+
+#extract marker values
+marker_value <- yield_answer$u #extract marker values
+pop_mean <- yield_answer$beta #extract population mean
+
+#make predictions
+ gs_prediction <- predict_maker %*% marker_value
+
+gs_prediction <- gs_prediction + as.numeric(pop_mean)#adding mean to the population
+
+#check accuracy
+#dev.new()
+#pdf(file = './data/Figures/Plot_GS_Example.pdf', height = 6, width = 6)
+plot(predict_phen$grain_yield, gs_prediction, xlab = 'Observed', ylab = 'GS Prediction')
+#dev.off()
+
+cor(predict_phen$grain_yield, gs_prediction)
+
+```
+
+```{r equivalence_to_gblup}
+#Use different variables to organize same phenTrain and phenoPredict group to test gblup
+phenoTrain <- train_phen
+phenoPredict <- predict_phen
+
+#give rownames as id
+phenoTrain$id <- paste('Plant_', rownames(phenoTrain), sep = '')
+phenoPredict$id <- paste('Plant_', rownames(phenoPredict), sep = '')
+
+ #order marker matrix by rbind values of phenoTrain and phenoPredict
+ord <- c(as.character(phenoTrain$id), as.character(phenoPredict$id))
+
+#order genotypic data
+g <- marker[match(ord, rownames(marker)),]
+
+            print(paste('Check that phenoTrain is in order with marker matrix is in order: ', all(as.character(phenoTrain$id) == rownames(g)[1:nrow(phenoTrain)]  && !is.null(phenoTrain$id)), sep='')) #check
+      print(paste('Check that phenoPredict is in order with matrix is in order: ', all(phenoPredict$id == rownames(g)[(nrow(g)-nrow(phenoPredict)+1):nrow(g)] && !is.null(phenoTrain$id)) , sep=''))
+
+            mat <- A.mat(g) #make genomic relationship matrix from
+
+            ##prepare phenotype frame
+            phenoPredict[ , "grain_yield"] <- NA #set phenotype value to NA
+
+            ##make phenotypic frame
+            phenotypic <- rbind(phenoTrain, phenoPredict)
+
+            #check that phenotypic and genotypic order are correct
+            print(paste('Check that all phenotype data and genotype data is in the same order:  ', all(rownames(g) == phenotypic$id && !is.null(phenoTrain$id)), sep=''))
+
+            ans <- kin.blup(phenotypic, K = mat, geno = "id" , pheno = "grain_yield") #run rrBLUP
+            preds <- ans$pred #extract prediction
+            
+            preds <- preds[names(preds) %in% phenoPredict$id] #get only predictions
+            preds <- as.data.frame(preds) #make into a dataframe
+            preds$id <- rownames(preds) #get plant_id
+            rownames(preds) <- NULL #set rownames as NULL
+            
+#compare mixed.solve (marker effects) to gblup on (realized relationship matrix)
+me <- as.data.frame(gs_prediction) #make into marker effect data frame
+me$id <- rownames(me) #add rownames as id
+
+#merge
+compare_data <- merge(me, preds, by = 'id') #merge together
+
+print(cor(compare_data$V1, compare_data$preds)) #run correlation
+
+plot(x = compare_data$V1, xlab = 'Marker Effect Value', y = compare_data$preds, ylab = 'GBLUP value', main = 'Comparison of mixed.solve vs gblup', sub = 'Red line is 1:1')
+
+abline(a = 0, b = 1, col = 'red')
+
+#clean up
+rm(phenoTrain, phenoPredict, ord, g, mat, phenotypic, ans, preds, me, compare_data)
+```
+
+
+#Session Information
+
+```{r sessionInformation}
+#recode session information
+sessionInfo()
+```

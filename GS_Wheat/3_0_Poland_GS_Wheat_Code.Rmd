@@ -90,7 +90,7 @@ scored <- sum(snp[10:263] != 'N') #number of individuals not missing
 present <- 1 - missing/254 #number present
 
 #MAF
-maf <- min(((alleleA - het)*2 + het), ((alleleB - het)*2 + het))/sum((alleleA - het)*2, het, (alleleB -het)*2)
+maf <- min(((alleleA - het)*2 + het), ((alleleB - het)*2 + het))/sum((alleleA - het)*2, 2 * het, (alleleB -het)*2)
 
 #percent het
 perHet <- het/scored
